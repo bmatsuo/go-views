@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +12,7 @@ import (
 
 var opt *Options
 var args []string
+var errLogger = log.New(os.Stderr, "go-views", log.LstdFlags)
 var templatePaths []string
 var viewFile = "views.go"
 var viewTemplate = `// This file is auto-generated.
@@ -23,33 +24,33 @@ import (
 	"text/template"
 )
 
-var Templates = template.Must(template.New("views").Parse(` + "`" +
-	`{|range $name, $template := .templates|}
-{{define "{|$name|}"}}{|$template|}{{end}}{|end|}
-` + "`" + `))
+var Templates = template.Must(template.New("views").Parse(` + "`" + `
+{|range $name, $template := .templates|}{{define "{|$name|}"}}{|$template|}{{end}}
+{|end|}` + "`" + `))
 
 func ExecuteTemplate(w io.Writer, name string, data interface{}) error {
 	return Templates.ExecuteTemplate(w, name, data)
 }
+func Render(w io.Writer, name string, data interface{}) error {
+	return ExecuteTemplate(w, name, data)
+}
 `
 
 func findTemplates(root string) error {
-	err := filepath.Walk(root, walkTemplates)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func walkTemplates(path string, info os.FileInfo, err error) error {
-	if err != nil {
-		return err
-	}
-	if info.IsDir() {
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(path, opt.Extension) {
+			templatePaths = append(templatePaths, path)
+		}
 		return nil
-	}
-	if strings.HasSuffix(path, opt.Extension) {
-		templatePaths = append(templatePaths, path)
+	})
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -76,26 +77,15 @@ func makeViewFile(w io.Writer, data interface{}) error {
 	return t.Execute(w, data)
 }
 
-func init() {
-	opt, args = parseOptions()
-}
-
-func main() {
-	root, err := filepath.Abs(args[0])
+func compile(root string) {
+	err := findTemplates(root)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error locating root: ", err)
-		os.Exit(1)
-	}
-	err = findTemplates(root)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "error locating templates: ", err)
-		os.Exit(1)
+		errLogger.Fatalln("error locating templates: ", err)
 	}
 
 	m, err := templateMap(root)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error reading files: ", err)
-		os.Exit(1)
+		errLogger.Fatalln("error reading files: ", err)
 	}
 	data := map[string]interface{}{
 		"package":   opt.Package,
@@ -106,13 +96,24 @@ func main() {
 	if opt.Output != "-" {
 		out, err = os.OpenFile(opt.Output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "error opening output: ", err)
+			errLogger.Println("error opening output: ", err)
 		}
 		defer out.Close()
 	}
 	err = makeViewFile(out, data)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error generating view file: ", err)
-		os.Exit(1)
+		errLogger.Fatalln("error generating view file: ", err)
 	}
+}
+
+func init() {
+	opt, args = parseOptions()
+}
+
+func main() {
+	root, err := filepath.Abs(args[0])
+	if err != nil {
+		errLogger.Fatalln("error locating root: ", err)
+	}
+	compile(root)
 }
