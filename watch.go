@@ -6,10 +6,9 @@ import (
 	"github.com/howeyc/fsnotify"
 )
 
-func watch(sig chan<- string, pathmatch func(string) bool, dirs ...string) (*fsnotify.Watcher, error) {
+func watch(sig chan<- string, pathmatch func(string) bool) (*fsnotify.Watcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		errLogger.Println("error creating watcher: ", err)
 		return nil, err
 	}
 
@@ -41,6 +40,7 @@ func watch(sig chan<- string, pathmatch func(string) bool, dirs ...string) (*fsn
 				errLogger.Println("watcher error:", err)
 			}
 		}
+		close(sig)
 	}()
 
 	return watcher, err
