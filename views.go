@@ -12,6 +12,7 @@ import (
 
 var opt *Options
 var args []string
+var outLogger = log.New(os.Stdout, "go-views", log.LstdFlags)
 var errLogger = log.New(os.Stderr, "go-views", log.LstdFlags)
 var templatePaths []string
 var viewFile = "views.go"
@@ -115,5 +116,9 @@ func main() {
 	if err != nil {
 		errLogger.Fatalln("error locating root: ", err)
 	}
-	compile(root)
+	if opt.Watch {
+		errLogger.Fatalln("directory watching does not work")
+	} else {
+		compile(root)
+	}
 }
