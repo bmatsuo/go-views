@@ -1,20 +1,18 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/howeyc/fsnotify"
 )
 
 var opt *Options
 var args []string
-var outLogger = log.New(os.Stdout, "go-views", log.LstdFlags)
-var errLogger = log.New(os.Stderr, "go-views", log.LstdFlags)
 var templatePaths []string
 var viewFile = "views.go"
 var viewTemplate = `// This file is auto-generated.
@@ -30,11 +28,8 @@ var Templates = template.Must(template.New("views").Parse(` + "`" + `
 {|range $name, $template := .templates|}{{define "{|$name|}"}}{|$template|}{{end}}
 {|end|}` + "`" + `))
 
-func ExecuteTemplate(w io.Writer, name string, data interface{}) error {
-	return Templates.ExecuteTemplate(w, name, data)
-}
 func Render(w io.Writer, name string, data interface{}) error {
-	return ExecuteTemplate(w, name, data)
+	return Templates.ExecuteTemplate(w, name, data)
 }
 `
 
@@ -57,6 +52,9 @@ func findDirectories(root string) ([]string, error) {
 
 func isTemplate(path string) bool {
 	return strings.HasSuffix(path, opt.Extension)
+}
+func isTemplateEvent(ev *fsnotify.FileEvent) bool {
+	return isTemplate(ev.Name)
 }
 
 func findTemplates(root string) ([]string, error) {
@@ -107,12 +105,12 @@ func makeViewFile(w io.Writer, data interface{}) error {
 func compile(root string) error {
 	paths, err := findTemplates(root)
 	if err != nil {
-		return fmt.Errorf("error locating templates: %v", err)
+		return err
 	}
 
 	m, err := templateMap(root, paths)
 	if err != nil {
-		return fmt.Errorf("error reading files: %v", err)
+		return err
 	}
 	data := map[string]interface{}{
 		"package":   opt.Package,
@@ -123,13 +121,13 @@ func compile(root string) error {
 	if opt.Output != "-" {
 		out, err = os.OpenFile(opt.Output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err != nil {
-			errLogger.Println("error opening output: ", err)
+			Error("output open error: ", err)
 		}
 		defer out.Close()
 	}
 	err = makeViewFile(out, data)
 	if err != nil {
-		return fmt.Errorf("error generating view file: %v", err)
+		return err
 	}
 	return nil
 }
@@ -137,38 +135,39 @@ func compile(root string) error {
 func watchAndRecompile(root string) error {
 	dirs, err := findDirectories(root)
 	if err != nil {
-		errLogger.Fatalln("discovery error: ", err)
+		Fatal("find error: ", err)
 	}
 
 	done := make(chan error)
-	recompile := make(chan string, 1)
+	recompile := make(chan *fsnotify.FileEvent, 1)
 	go func() {
-		for path := range recompile {
-			outLogger.Println("recompile triggered for ", path)
-			err := compile(root)
+		for event := range recompile {
+			Debug(1, "watcher triggered recompile: ", event.Name)
+			err := compile(event.Name)
 			if err != nil {
-				errLogger.Println(err)
+				Error("compile error: ", err)
 			}
 		}
 		done <- nil
 	}()
 
-	watcher, err := watch(recompile, isTemplate)
+	watcher, err := watch(recompile, isTemplateEvent)
 	if err != nil {
 		close(recompile)
-		errLogger.Fatalln("error initializing watcher: ", err)
+		Fatal("watch error: ", err)
 	}
 
 	for _, d := range dirs {
 		err := watcher.Watch(d)
 		if err != nil {
 			watcher.Close()
-			errLogger.Fatalln("watcher populate error: ", err)
+			Fatal("populate error: ", err)
 		}
 	}
 
 	return <-done
 }
+
 
 func init() {
 	opt, args = parseOptions()
@@ -177,19 +176,19 @@ func init() {
 func main() {
 	root, err := filepath.Abs(args[0])
 	if err != nil {
-		errLogger.Fatalln("error locating root: ", err)
+		Fatal("path error: ", err)
 	}
 
 	err = compile(root)
 	if err != nil {
 		// probably shouldn't be fatal with opt.Watch
-		errLogger.Fatalln(err)
+		Fatal("compile error:", err)
 	}
 
 	if opt.Watch {
 		err = watchAndRecompile(root)
 		if err != nil {
-			errLogger.Fatalln(err)
+			Fatal("watch error:", err)
 		}
 	}
 }

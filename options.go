@@ -9,6 +9,7 @@ type Options struct {
 	Package   string
 	Output    string
 	Watch     bool
+	Debug     int
 }
 
 func parseOptions() (*Options, []string) {
@@ -17,6 +18,7 @@ func parseOptions() (*Options, []string) {
 	flag.StringVar(&opt.Package, "pkg", "views", "view package name")
 	flag.StringVar(&opt.Output, "o", "-", "output filename")
 	flag.BoolVar(&opt.Watch, "w", false, "watch and recompile")
+	flag.IntVar(&opt.Debug, "d", 0, "debug print level")
 	flag.Parse()
 	return opt, flag.Args()
 }
