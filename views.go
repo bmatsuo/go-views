@@ -13,7 +13,6 @@ import (
 
 var opt *Options
 var args []string
-var templatePaths []string
 var viewFile = "views.go"
 var viewTemplate = `// This file is auto-generated.
 // Do not commit it to any version control system.
@@ -24,9 +23,14 @@ import (
 	"text/template"
 )
 
-var Templates = template.Must(template.New("views").Parse(` + "`" + `
-{|range $name, $template := .templates|}{{define "{|$name|}"}}{|$template|}{{end}}
-{|end|}` + "`" + `))
+var viewsRaw = ` + "`" + `
+{|range $name, $tmpl := .templates|}{{define "{|$name|}"}}{|$tmpl|}{{end}}
+{|end|}` + "`" + `
+var views *template.Template
+
+func Init(fns template.FuncMap) {
+	template.Must(template.New("views").Funcs(fns).Parse(viewTemplate))
+}
 
 func Render(w io.Writer, name string, data interface{}) error {
 	return Templates.ExecuteTemplate(w, name, data)
@@ -143,7 +147,7 @@ func watchAndRecompile(root string) error {
 	go func() {
 		for event := range recompile {
 			Debug(1, "watcher triggered recompile: ", event.Name)
-			err := compile(event.Name)
+			err := compile(root)
 			if err != nil {
 				Error("compile error: ", err)
 			}
@@ -171,6 +175,7 @@ func watchAndRecompile(root string) error {
 
 func init() {
 	opt, args = parseOptions()
+	DebugLevel = opt.Debug
 }
 
 func main() {
