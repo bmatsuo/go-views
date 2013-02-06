@@ -7,10 +7,10 @@ import (
 
 var ErrLogger = log.New(os.Stderr, "", log.LstdFlags)
 var OutLogger = log.New(os.Stdout, "", log.LstdFlags)
-var debugLevel int
+var DebugLevel int
 
 func Debug(level int, v ...interface{}) {
-	if debugLevel > level {
+	if DebugLevel > level {
 		OutLogger.Print(v)
 	}
 }
@@ -25,7 +25,7 @@ func Fatal(v ...interface{}) {
 }
 
 func Debugf(level int, format string, v ...interface{}) {
-	if debugLevel > level {
+	if DebugLevel > level {
 		OutLogger.Printf(format, v...)
 	}
 }

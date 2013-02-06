@@ -28,12 +28,19 @@ var viewsRaw = ` + "`" + `
 {|end|}` + "`" + `
 var views *template.Template
 
+func parseTemplate(fns template.FuncMap) {
+	views = template.Must(template.New("views").Funcs(fns).Parse(viewsRaw))
+}
+
 func Init(fns template.FuncMap) {
-	template.Must(template.New("views").Funcs(fns).Parse(viewTemplate))
+	parseTemplate(fns)
 }
 
 func Render(w io.Writer, name string, data interface{}) error {
-	return Templates.ExecuteTemplate(w, name, data)
+	if views == nil {
+		parseTemplate(nil)
+	}
+	return views.ExecuteTemplate(w, name, data)
 }
 `
 
