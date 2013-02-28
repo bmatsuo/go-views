@@ -20,7 +20,7 @@ package {|or .package "views"|}
 
 import (
 	"io"
-	"text/template"
+	"html/template"
 )
 
 var viewsRaw = ` + "`" + `
@@ -178,7 +178,6 @@ func watchAndRecompile(root string) error {
 
 	return <-done
 }
-
 
 func init() {
 	opt, args = parseOptions()
