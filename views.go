@@ -19,6 +19,8 @@ var viewTemplate = `// This file is auto-generated.
 package {|or .package "views"|}
 
 import (
+	"github.com/bmatsuo/banjo"
+
 	"io"
 	"html/template"
 )
@@ -26,21 +28,17 @@ import (
 var viewsRaw = ` + "`" + `
 {|range $name, $tmpl := .templates|}{{define "{|$name|}"}}{|$tmpl|}{{end}}
 {|end|}` + "`" + `
-var views *template.Template
-
-func parseTemplate(fns template.FuncMap) {
-	views = template.Must(template.New("views").Funcs(fns).Parse(viewsRaw))
-}
 
 func Init(fns template.FuncMap) {
-	parseTemplate(fns)
+	banjo.Funcs(fns)
+	banjo.Parse("", viewsRaw)
 }
 
 func Render(w io.Writer, name string, data interface{}) error {
-	if views == nil {
-		parseTemplate(nil)
+	context := &banjo.Context{
+		Data:data,
 	}
-	return views.ExecuteTemplate(w, name, data)
+	return context.Render(w, name, data)
 }
 `
 
