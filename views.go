@@ -21,7 +21,6 @@ package {|or .package "views"|}
 import (
 	"github.com/bmatsuo/banjo"
 
-	"io"
 	"html/template"
 )
 
@@ -29,16 +28,9 @@ var viewsRaw = ` + "`" + `
 {|range $name, $tmpl := .templates|}{{define "{|$name|}"}}{|$tmpl|}{{end}}
 {|end|}` + "`" + `
 
-func Init(fns template.FuncMap) {
+func Init(fns template.FuncMap) error {
 	banjo.Funcs(fns)
-	banjo.Parse("", viewsRaw)
-}
-
-func Render(w io.Writer, name string, data interface{}) error {
-	context := &banjo.Context{
-		Data:data,
-	}
-	return context.Render(w, name, data)
+	return banjo.Parse("", viewsRaw)
 }
 `
 
